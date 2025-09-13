@@ -147,3 +147,34 @@
     transform: rotate(360deg);
   }
 }
+
+.circle-grow-1 {
+  --size: 30px;
+  --color: currentColor;
+  --animation-timing-function: linear;
+  --animation-duration: 1s;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background-color: var(--color);
+  opacity: 0;
+  transform: scale(0);
+  animation: var(--animation-timing-function) var(--animation-duration) infinite circle-grow-1-animation;
+}
+
+@keyframes circle-grow-1-animation {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+
+  80% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
