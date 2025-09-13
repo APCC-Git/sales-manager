@@ -11,10 +11,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import { SettingsDialog } from '@/components/SettingsDialog';
+import { SettingsDialog } from '@/components/dialog/SettingsDialog';
 import { DataUrls } from '@/types/DataUrls';
 import { Tickets, ScanQrCode, Minus } from 'lucide-react';
 import { Item } from '@/types/Item';
+import { SalesData } from '@/types/SalesData';
 import {
   Card,
   CardAction,
@@ -23,19 +24,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { AddItemDialog } from '@/components/AddItemDialog';
+import { AddItemDialog } from '@/components/dialog/AddItemDialog';
 import { Separator } from '@/components/ui/separator';
-import { EditItemDialog } from '@/components/EditItemDialog';
-import { DeleteItemDialog } from '@/components/DeleteItemDialog';
+import { EditItemDialog } from '@/components/dialog/EditItemDialog';
+import { DeleteItemDialog } from '@/components/dialog/DeleteItemDialog';
 
-interface SalesData {
-  timestamp: string;
-  jst: string;
-  name: string;
-  totalSales: number;
-  payment: number;
-  method: string;
-}
+import { columns } from '@/components/table/Columns';
+import { DataTable } from '@/components/table/DataTable';
 
 interface PredictionData {
   time: string;
@@ -107,18 +102,19 @@ const CDSalesTracker: React.FC = () => {
         method: 'GET',
       });
       if (res.ok) {
-        const data = (await res.json()) as SalesData[];
+        const data = await res.json();
+        const fetchedSalesData = data.data as SalesData[];
         console.log(data);
-        setCurrentSales(data.length);
-        for (let i = 0; i < data.length; i++) {
-          data[i].totalSales = i + 1;
+        setCurrentSales(fetchedSalesData.length);
+        for (let i = 0; i < fetchedSalesData.length; i++) {
+          fetchedSalesData[i].totalSales = i + 1;
         }
 
-        const updatedItemList = updateSoldCounts(data, itemList);
+        const updatedItemList = updateSoldCounts(fetchedSalesData, itemList);
         console.log(updatedItemList);
         onItemListChange(updatedItemList);
 
-        setSalesHistory(data);
+        setSalesHistory(fetchedSalesData);
       }
     } catch (e) {
       console.error(e);
@@ -339,8 +335,8 @@ const CDSalesTracker: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 w-full">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <div className="min-h-screen bg-gray-50 p-6 w-full font-noto">
+      <div className="max-w-full mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* 左側 */}
         <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
           <div className={'flex justify-center gap-3'}>
@@ -452,10 +448,12 @@ const CDSalesTracker: React.FC = () => {
               </CardContent>
             </Card>
           )}
+          <Separator />
+          <DataTable columns={columns} data={salesHistory} />
         </div>
 
         {/* 右側 */}
-        <div className="bg-white rounded-lg shadow-lg p-6 min-h-[76vh]">
+        <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
           <div className="bg-blue-50 rounded-lg p-6 mb-4 text-center">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">現在の売上</h2>
             <div className="text-6xl font-bold text-blue-600 mb-4">{currentSales}</div>
@@ -468,6 +466,7 @@ const CDSalesTracker: React.FC = () => {
             </div>
             <div className="text-sm text-gray-600 mt-2">達成率: {achievementRate.toFixed(1)}%</div>
           </div>
+          <Separator />
           <h3 className="text-lg font-bold text-gray-800 mb-4">売上推移グラフ</h3>
           {predictionData.length > 0 ? (
             <ResponsiveContainer width="100%" height={500}>

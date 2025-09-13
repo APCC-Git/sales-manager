@@ -14,7 +14,6 @@ export async function GET(req: NextRequest) {
   }
 
   const targetUrl = `${scriptUrl}?sheetUrl=${encodeURIComponent(sheetUrl)}&sheetName=${encodeURIComponent(sheetName)}`;
-  console.log(targetUrl);
 
   try {
     const res = await fetch(targetUrl, {
@@ -34,7 +33,12 @@ export async function GET(req: NextRequest) {
     }
 
     const data = await res.json();
-    console.log(data);
+    if (!data.success) {
+      return NextResponse.json(
+        { error: data.message || 'GAS APIからのエラー' },
+        { status: data.status || 500 }
+      );
+    }
     return NextResponse.json(data);
   } catch (error) {
     // ネットワークエラーやその他の例外をキャッチ
@@ -92,9 +96,12 @@ export async function POST(req: NextRequest) {
 
     const data = await res.json();
 
+    // GASはステータスコードを設定できないのでsuccessでエラーハンドリング
     if (!data.success) {
-      console.log(data);
-      return NextResponse.json({ error: data.error || 'GAS APIからのエラー' }, { status: 401 });
+      return NextResponse.json(
+        { error: data.message || 'GAS APIからのエラー' },
+        { status: data.status || 500 }
+      );
     }
     return NextResponse.json(data);
   } catch (error) {
@@ -135,7 +142,6 @@ export async function DELETE(req: NextRequest) {
       }),
     });
 
-    console.log(res);
     // レスポンスのステータスコードをチェック
     if (!res.ok) {
       const errorData = await res
@@ -146,7 +152,10 @@ export async function DELETE(req: NextRequest) {
 
     const data = await res.json();
     if (!data.success) {
-      return NextResponse.json({ error: data.error || 'GAS APIからのエラー' }, { status: 401 });
+      return NextResponse.json(
+        { error: data.message || 'GAS APIからのエラー' },
+        { status: data.status || 500 }
+      );
     }
     return NextResponse.json(data);
   } catch (error) {
