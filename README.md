@@ -1,4 +1,5 @@
 # 売上管理アプリ
+https://festa-sales-manager.vercel.app/
 
 ## GAS設定
 [サンプルコード](./googleAppsScript.js)  

@@ -7,13 +7,13 @@ function doPost(e) {
   // API認証
   if (data.token !== SECRET_KEY) {
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, message: 'SECRET_KEYが違います。', code: 401 })
+      JSON.stringify({ success: false, message: 'SECRET_KEYが違います。', status: 401 })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
   if (!data.sheetName || !data.sheetUrl) {
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, message: '不正なリクエスト形式です。', code: 400 })
+      JSON.stringify({ success: false, message: '不正なリクエスト形式です。', status: 400 })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -21,7 +21,7 @@ function doPost(e) {
 
   if (!sheet) {
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, message: 'スプレッドシートが見つかりません。', code: 404 })
+      JSON.stringify({ success: false, message: 'スプレッドシートが見つかりません。', status: 404 })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -29,7 +29,7 @@ function doPost(e) {
   if (param === 'post' || !param) {
     if (!data.timestamp || !data.jst || !data.name || !data.payment || !data.method) {
       return ContentService.createTextOutput(
-        JSON.stringify({ success: false, message: '不正なリクエスト形式です。', code: 400 })
+        JSON.stringify({ success: false, message: '不正なリクエスト形式です。', status: 400 })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -37,12 +37,12 @@ function doPost(e) {
     sheet.appendRow([data.timestamp, data.jst, data.name, data.payment, data.method]);
 
     return ContentService.createTextOutput(
-      JSON.stringify({ success: true, message: '売上が追加されました。', code: 201 })
+      JSON.stringify({ success: true, message: '売上が追加されました。', status: 201 })
     ).setMimeType(ContentService.MimeType.JSON);
   } else if (param === 'delete') {
     if (!data.name) {
       return ContentService.createTextOutput(
-        JSON.stringify({ success: false, message: '不正なリクエスト形式です。', code: 400 })
+        JSON.stringify({ success: false, message: '不正なリクエスト形式です。', status: 400 })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -53,7 +53,7 @@ function doPost(e) {
 
     if (nameIndex === -1) {
       return ContentService.createTextOutput(
-        JSON.stringify({ success: false, message: 'name列が見つかりません。', code: 500 })
+        JSON.stringify({ success: false, message: 'name列が見つかりません。', status: 500 })
       ).setMimeType(ContentService.MimeType.JSON);
     }
 
@@ -65,7 +65,7 @@ function doPost(e) {
           JSON.stringify({
             success: true,
             message: `${data.name}の最新データを一件削除しました。`,
-            code: 200,
+            status: 200,
           })
         ).setMimeType(ContentService.MimeType.JSON);
       }
@@ -76,7 +76,7 @@ function doPost(e) {
       JSON.stringify({
         success: false,
         message: `指定された名前(${data.name})のデータが見つかりません。`,
-        code: 404,
+        status: 404,
       })
     ).setMimeType(ContentService.MimeType.JSON);
   }
@@ -86,7 +86,7 @@ function doPost(e) {
 function doGet(e) {
   if (!e.parameter) {
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, message: '不正なリクエスト形式です。', code: 400 })
+      JSON.stringify({ success: false, message: '不正なリクエスト形式です。', status: 400 })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -94,7 +94,7 @@ function doGet(e) {
 
   if (!param.sheetUrl || !param.sheetName) {
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, message: '不正なリクエスト形式です。', code: 400 })
+      JSON.stringify({ success: false, message: '不正なリクエスト形式です。', status: 400 })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -105,7 +105,7 @@ function doGet(e) {
 
   if (!sheet) {
     return ContentService.createTextOutput(
-      JSON.stringify({ success: false, message: 'スプレッドシートが見つかりません', code: 404 })
+      JSON.stringify({ success: false, message: 'スプレッドシートが見つかりません', status: 404 })
     ).setMimeType(ContentService.MimeType.JSON);
   }
 
@@ -119,7 +119,7 @@ function doGet(e) {
     return obj;
   });
 
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(
-    ContentService.MimeType.JSON
-  );
+  return ContentService.createTextOutput(
+    JSON.stringify({ success: true, data: result, status: 200 })
+  ).setMimeType(ContentService.MimeType.JSON);
 }
