@@ -414,7 +414,7 @@ const CDSalesTracker: React.FC = () => {
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                       >
-                        <Tickets size={30} /> 売上
+                        {!loading ? <Tickets size={30} /> : <div className="square-spin-2" />} 売上
                       </button>
                       <button
                         onClick={() => addSale('auPay', item.name, item.price)}
@@ -425,7 +425,8 @@ const CDSalesTracker: React.FC = () => {
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                       >
-                        <ScanQrCode size={30} /> 売上
+                        {!loading ? <ScanQrCode size={30} /> : <div className="square-spin-2" />}{' '}
+                        売上
                       </button>
                       <button
                         onClick={() => removeLastSales(item.name)}
@@ -436,7 +437,7 @@ const CDSalesTracker: React.FC = () => {
                             : 'bg-gray-300 text-gray-500 cursor-not-allowed'
                         }`}
                       >
-                        <Minus />
+                        {!loading ? <Minus /> : <div className="square-spin-2" />}
                       </button>
                     </div>
                   </div>
