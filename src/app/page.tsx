@@ -13,7 +13,7 @@ import {
 } from 'recharts';
 import { SettingsDialog } from '@/components/SettingsDialog';
 import { DataUrls } from '@/types/DataUrls';
-import { Tickets, ScanQrCode, Trash, Edit, Minus } from 'lucide-react';
+import { Tickets, ScanQrCode, Minus } from 'lucide-react';
 import { Item } from '@/types/Item';
 import {
   Card,
@@ -172,16 +172,7 @@ const CDSalesTracker: React.FC = () => {
       if (res.ok) {
         setCurrentSales(newSales);
         setSalesHistory(prev => [...prev, newSalesData]);
-        const newItemList = itemList.map(item => {
-          if (item.name === name) {
-            return {
-              ...item,
-              sold: item.sold + 1,
-            };
-          }
-          return item;
-        });
-        onItemListChange(newItemList);
+        changeSoldCount(name, 1);
       }
     } catch (e) {
       console.error(e);
@@ -207,16 +198,7 @@ const CDSalesTracker: React.FC = () => {
         const newSales = currentSales - 1;
         setCurrentSales(newSales);
         setSalesHistory(prev => prev.slice(0, -1));
-        const newItemList = itemList.map(item => {
-          if (item.name === name) {
-            return {
-              ...item,
-              sold: item.sold - 1,
-            };
-          }
-          return item;
-        });
-        onItemListChange(newItemList);
+        changeSoldCount(name, -1);
       }
     } catch (e) {
       console.error(e);
@@ -231,8 +213,20 @@ const CDSalesTracker: React.FC = () => {
     onItemListChange(newItemList);
   };
 
-  const changeSoldCount = (item: Item, soldCount: number) => {
-    const newItemList = itemList.map(i => (i.name === item.name ? { ...i, sold: soldCount } : i));
+  const changeSoldCount = (itemName: string, additionalSoldCount: number) => {
+    // const newItemList = itemList.map(i =>
+    //   i.name === item.name ? { ...i, sold: i.sold + additionalSoldCount } : i
+    // );
+    // onItemListChange(newItemList);
+    const newItemList = itemList.map(item => {
+      if (item.name === itemName) {
+        return {
+          ...item,
+          sold: item.sold + additionalSoldCount,
+        };
+      }
+      return item;
+    });
     onItemListChange(newItemList);
   };
 
