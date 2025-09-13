@@ -191,9 +191,16 @@ const CDSalesTracker: React.FC = () => {
         }),
       });
       if (res.ok) {
-        const newSales = currentSales - 1;
-        setCurrentSales(newSales);
-        setSalesHistory(prev => prev.slice(0, -1));
+        setCurrentSales(prev => prev - 1);
+        setSalesHistory(prev => {
+          const index = [...prev].reverse().findIndex(item => item.name === name);
+          if (index === -1) return prev; // 見つからなければそのまま返す
+
+          // reverseしたので元のindexに直す
+          const removeIndex = prev.length - 1 - index;
+
+          return prev.filter((_, i) => i !== removeIndex);
+        });
         changeSoldCount(name, -1);
       }
     } catch (e) {
@@ -453,7 +460,7 @@ const CDSalesTracker: React.FC = () => {
         </div>
 
         {/* 右側 */}
-        <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+        <div className="bg-white rounded-lg shadow-lg p-6 space-y-6 flex flex-col">
           <div className="bg-blue-50 rounded-lg p-6 mb-4 text-center">
             <h2 className="text-2xl font-bold text-gray-800 mb-2">現在の売上</h2>
             <div className="text-6xl font-bold text-blue-600 mb-4">{currentSales}</div>
@@ -467,55 +474,57 @@ const CDSalesTracker: React.FC = () => {
             <div className="text-sm text-gray-600 mt-2">達成率: {achievementRate.toFixed(1)}%</div>
           </div>
           <Separator />
-          <h3 className="text-lg font-bold text-gray-800 mb-4">売上推移グラフ</h3>
-          {predictionData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={500}>
-              <LineChart data={predictionData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="time" tick={{ fontSize: 12 }} />
-                <YAxis />
-                <Tooltip formatter={(value: number, name: string) => [`${value}枚`, name]} />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="actual"
-                  stroke="#2563eb"
-                  strokeWidth={3}
-                  name="実績"
-                  connectNulls={true}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="predicted"
-                  stroke="#f59e0b"
-                  strokeWidth={2}
-                  strokeDasharray="5 5"
-                  name="予測"
-                  connectNulls={true}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="flex items-center justify-center h-[75vh] text-gray-400">
-              <div className="text-center">
-                <div className="text-6xl mb-4">📊</div>
-                <p>販売開始後にグラフが表示されます</p>
+          <div className={'flex-1 flex flex-col justify-between'}>
+            <h3 className="text-lg font-bold text-gray-800 mb-4">売上推移グラフ</h3>
+            {predictionData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={500} className={'h-full'}>
+                <LineChart data={predictionData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="time" tick={{ fontSize: 12 }} />
+                  <YAxis />
+                  <Tooltip formatter={(value: number, name: string) => [`${value}枚`, name]} />
+                  <Legend />
+                  <Line
+                    type="monotone"
+                    dataKey="actual"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    name="実績"
+                    connectNulls={true}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="predicted"
+                    stroke="#f59e0b"
+                    strokeWidth={2}
+                    strokeDasharray="5 5"
+                    name="予測"
+                    connectNulls={true}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-gray-400">
+                <div className="text-center">
+                  <div className="text-6xl mb-4">📊</div>
+                  <p>販売開始後にグラフが表示されます</p>
+                </div>
               </div>
-            </div>
-          )}
-          {/* 予測表示 */}
-          <div className="bg-yellow-50 rounded-lg p-4">
-            <h3 className="text-lg font-bold text-yellow-800 mb-2">📈 売上予測</h3>
-            <div className="grid grid-cols-1 gap-2">
-              <div>
-                <span className="text-yellow-700">最終予測売上:</span>
-                <span className="font-bold text-xl ml-2">{finalPrediction}枚</span>
-              </div>
-              <div>
-                <span className="text-yellow-700">予測達成率:</span>
-                <span className="font-bold text-xl ml-2">
-                  {predictedAchievementRate.toFixed(1)}%
-                </span>
+            )}
+            {/* 予測表示 */}
+            <div className="bg-yellow-50 rounded-lg p-4">
+              <h3 className="text-lg font-bold text-yellow-800 mb-2">📈 売上予測</h3>
+              <div className="grid grid-cols-1 gap-2">
+                <div>
+                  <span className="text-yellow-700">最終予測売上:</span>
+                  <span className="font-bold text-xl ml-2">{finalPrediction}枚</span>
+                </div>
+                <div>
+                  <span className="text-yellow-700">予測達成率:</span>
+                  <span className="font-bold text-xl ml-2">
+                    {predictedAchievementRate.toFixed(1)}%
+                  </span>
+                </div>
               </div>
             </div>
           </div>
