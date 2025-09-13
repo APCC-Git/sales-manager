@@ -13,14 +13,25 @@ import {
 } from 'recharts';
 import { SettingsDialog } from '@/components/SettingsDialog';
 import { DataUrls } from '@/types/DataUrls';
-import { Tickets, ScanQrCode } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { TimePicker } from '@/components/ui/datatime-picker';
+import { Tickets, ScanQrCode, Trash, Edit, Minus } from 'lucide-react';
+import { Item } from '@/types/Item';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { AddItemDialog } from '@/components/AddItemDialog';
+import { Separator } from '@/components/ui/separator';
+import { EditItemDialog } from '@/components/EditItemDialog';
+import { DeleteItemDialog } from '@/components/DeleteItemDialog';
 
 interface SalesData {
   timestamp: string;
   jst: string;
+  name: string;
   totalSales: number;
   payment: number;
   method: string;
@@ -44,9 +55,15 @@ const CDSalesTracker: React.FC = () => {
   const [startTime, setStartTime] = useState<Date | undefined>(undefined);
   const [endTime, setEndTime] = useState<Date | undefined>(undefined);
   const [currentSales, setCurrentSales] = useState<number>(0);
-  const [price, setPrice] = useState<number>(200);
   const [salesHistory, setSalesHistory] = useState<SalesData[]>([]);
-  const [isActive, setIsActive] = useState<boolean>(true);
+
+  const [addItemDialogOpen, setAddItemDialogOpen] = useState<boolean>(false);
+  const [editItemDialogOpen, setEditItemDialogOpen] = useState<boolean>(false);
+  const [editingItem, setEditingItem] = useState<Item | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deletingItem, setDeletingItem] = useState<Item | null>(null);
+
+  const [itemList, setItemList] = useState<Item[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [dataUrls, setDataUrls] = useState<DataUrls>({
     sheetUrl: '',
@@ -68,16 +85,21 @@ const CDSalesTracker: React.FC = () => {
 
   // 設定をローカルストレージから読み込む
   useEffect(() => {
-    const data = localStorage.getItem('dataUrls');
-    if (data) {
-      const parsedData = JSON.parse(data);
+    const SavedItemData = localStorage.getItem('itemList');
+    if (!SavedItemData) return;
+    const parsedItemData = JSON.parse(SavedItemData);
+    onItemListChange(parsedItemData);
+
+    const savedDataUrls = localStorage.getItem('dataUrls');
+    if (savedDataUrls) {
+      const parsedData = JSON.parse(savedDataUrls);
       setDataUrls(parsedData);
-      loadSales(parsedData);
+      loadSales(parsedData, parsedItemData);
     }
   }, []);
 
-  // 売上読み込み
-  const loadSales = async (dataUrls: DataUrls) => {
+  // GASから売上読み込み
+  const loadSales = async (dataUrls: DataUrls, itemList: Item[]) => {
     setLoading(true);
     const url = `/api/payments?scriptUrl=${encodeURIComponent(dataUrls.scriptUrl)}&scriptToken=${encodeURIComponent(dataUrls.scriptToken)}&sheetUrl=${encodeURIComponent(dataUrls.sheetUrl)}&sheetName=${encodeURIComponent(dataUrls.sheetName)}`;
     try {
@@ -85,12 +107,17 @@ const CDSalesTracker: React.FC = () => {
         method: 'GET',
       });
       if (res.ok) {
-        const data = await res.json();
-        // console.log(data);
+        const data = (await res.json()) as SalesData[];
+        console.log(data);
         setCurrentSales(data.length);
         for (let i = 0; i < data.length; i++) {
           data[i].totalSales = i + 1;
         }
+
+        const updatedItemList = updateSoldCounts(data, itemList);
+        console.log(updatedItemList);
+        onItemListChange(updatedItemList);
+
         setSalesHistory(data);
       }
     } catch (e) {
@@ -100,7 +127,21 @@ const CDSalesTracker: React.FC = () => {
     }
   };
 
-  const addSale = async (method: 'ticket' | 'auPay') => {
+  // 履歴から itemList の sold を更新する関数
+  function updateSoldCounts(sales: SalesData[], items: Item[]): Item[] {
+    // 商品ごとの売上数を集計
+    const soldCounts = sales.reduce<Record<string, number>>((acc, sale) => {
+      acc[sale.name] = (acc[sale.name] || 0) + 1;
+      return acc;
+    }, {});
+    // itemList を更新
+    return items.map(item => ({
+      ...item,
+      sold: soldCounts[`${item.name}`] || 0, // なければ 0
+    }));
+  }
+
+  const addSale = async (method: 'ticket' | 'auPay', name: string, price: number) => {
     setLoading(true);
     try {
       const newSales = currentSales + 1;
@@ -108,6 +149,7 @@ const CDSalesTracker: React.FC = () => {
       const newSalesData: SalesData = {
         timestamp: now.toISOString(),
         jst: now.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
+        name,
         totalSales: newSales,
         payment: price,
         method: method,
@@ -121,6 +163,7 @@ const CDSalesTracker: React.FC = () => {
         body: JSON.stringify({
           timestamp: newSalesData.timestamp,
           jst: newSalesData.jst,
+          name: newSalesData.name,
           payment: newSalesData.payment,
           method: newSalesData.method,
           ...dataUrls,
@@ -129,6 +172,16 @@ const CDSalesTracker: React.FC = () => {
       if (res.ok) {
         setCurrentSales(newSales);
         setSalesHistory(prev => [...prev, newSalesData]);
+        const newItemList = itemList.map(item => {
+          if (item.name === name) {
+            return {
+              ...item,
+              sold: item.sold + 1,
+            };
+          }
+          return item;
+        });
+        onItemListChange(newItemList);
       }
     } catch (e) {
       console.error(e);
@@ -137,12 +190,7 @@ const CDSalesTracker: React.FC = () => {
     }
   };
 
-  const resetSales = () => {
-    setCurrentSales(0);
-    setSalesHistory([]);
-  };
-
-  const removeLastSales = async () => {
+  const removeLastSales = async (name: string) => {
     setLoading(true);
     try {
       const res = await fetch('/api/payments', {
@@ -151,14 +199,24 @@ const CDSalesTracker: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
+          name,
           ...dataUrls,
         }),
       });
       if (res.ok) {
         const newSales = currentSales - 1;
         setCurrentSales(newSales);
-
         setSalesHistory(prev => prev.slice(0, -1));
+        const newItemList = itemList.map(item => {
+          if (item.name === name) {
+            return {
+              ...item,
+              sold: item.sold - 1,
+            };
+          }
+          return item;
+        });
+        onItemListChange(newItemList);
       }
     } catch (e) {
       console.error(e);
@@ -167,22 +225,32 @@ const CDSalesTracker: React.FC = () => {
     }
   };
 
-  const startTracking = () => {
-    const now = new Date();
-    setIsActive(true);
-    setSalesHistory([
-      {
-        timestamp: now.toISOString(),
-        jst: now.toLocaleString('ja-JP', { timeZone: 'Asia/Tokyo' }),
-        totalSales: currentSales,
-        payment: price,
-        method: 'ticket',
-      },
-    ]);
+  // ======== 商品追加/編集/削除/保存 ========
+  const addItem = (newItem: Item) => {
+    const newItemList = [...itemList, newItem];
+    onItemListChange(newItemList);
   };
 
-  const stopTracking = () => {
-    setIsActive(false);
+  const changeSoldCount = (item: Item, soldCount: number) => {
+    const newItemList = itemList.map(i => (i.name === item.name ? { ...i, sold: soldCount } : i));
+    onItemListChange(newItemList);
+  };
+
+  const handleEditItem = (edited: Item) => {
+    const newItemList = itemList.map(item => (item.name === edited.name ? edited : item));
+    onItemListChange(newItemList);
+  };
+
+  const handleDeleteItem = (target: Item) => {
+    const newItemList = itemList.filter(item => item.name !== target.name);
+    onItemListChange(newItemList);
+  };
+
+  const onItemListChange = (itemList: Item[]) => {
+    setItemList(itemList);
+    localStorage.setItem('itemList', JSON.stringify(itemList));
+    const totalTargetSales = itemList.reduce((acc, item) => acc + item.targetSales, 0);
+    setTargetSales(totalTargetSales);
   };
 
   const calculatePrediction = (): PredictionData[] => {
@@ -256,7 +324,6 @@ const CDSalesTracker: React.FC = () => {
   };
 
   const predictionData = calculatePrediction();
-  // console.log(predictionData);
   const finalPrediction =
     predictionData.length > 0
       ? predictionData[predictionData.length - 1].predicted || currentSales
@@ -278,141 +345,135 @@ const CDSalesTracker: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-6 w-full">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 左側: コントロールパネル */}
+        {/* 左側 */}
         <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-          {/* 売上カウンター */}
-          <SettingsDialog dataUrls={dataUrls} setDataUrls={handleDataUrlsChange} />
-
-          <div className="text-center mb-8">
-            <div className="bg-blue-50 rounded-lg p-6 mb-4">
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">現在の売上</h2>
-              <div className="text-6xl font-bold text-blue-600 mb-4">{currentSales}</div>
-              <div className="text-lg text-gray-600">/ {targetSales} 枚</div>
-              <div className="w-full bg-gray-200 rounded-full h-4 mt-4">
-                <div
-                  className="bg-blue-600 h-4 rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(achievementRate, 100)}%` }}
-                ></div>
-              </div>
-              <div className="text-sm text-gray-600 mt-2">
-                達成率: {achievementRate.toFixed(1)}%
-              </div>
-            </div>
-
-            <div className="flex justify-center gap-4 flex-wrap">
-              <button
-                onClick={removeLastSales}
-                disabled={!isActive || currentSales === 0 || loading}
-                className={`text-3xl font-bold py-4 px-8 rounded-full transition-all transform hover:scale-105 ${
-                  isActive && currentSales > 0 && !loading
-                    ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                − 取消
-              </button>
-              <button
-                onClick={() => addSale('ticket')}
-                disabled={!isActive || loading}
-                className={`flex gap-2 items-center justify-center text-3xl font-bold py-4 px-8 rounded-full transition-all transform hover:scale-105 ${
-                  isActive && !loading
-                    ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                <Tickets size={30} /> 売上
-              </button>
-              <button
-                onClick={() => addSale('auPay')}
-                disabled={!isActive || loading}
-                className={`flex gap-2 items-center justify-center text-3xl font-bold py-4 px-8 rounded-full transition-all transform hover:scale-105 ${
-                  isActive && !loading
-                    ? 'bg-[#EB5505] hover:bg-[#bf4402] text-white shadow-lg'
-                    : 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                }`}
-              >
-                <ScanQrCode size={30} /> 売上
-              </button>
-            </div>
-          </div>
-
-          {/* 設定パネル */}
-          <div className="grid grid-cols-1 gap-4 mb-6">
-            <div>
-              <Label
-                htmlFor={'target-sales'}
-                className="block text-sm font-medium text-gray-700 mb-2"
-              >
-                目標売上個数
-              </Label>
-              <Input
-                id={'target-sales'}
-                type="number"
-                value={targetSales}
-                onChange={e => setTargetSales(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                min="1"
+          <div className={'flex justify-center gap-3'}>
+            {/*商品追加ボタン*/}
+            <div className={'w-full'}>
+              <AddItemDialog
+                onAdd={addItem}
+                open={addItemDialogOpen}
+                onOpenChange={setAddItemDialogOpen}
               />
             </div>
-            <div>
-              <Label htmlFor={'price'} className="block text-sm font-medium text-gray-700 mb-2">
-                商品の価格
-              </Label>
-              <Input
-                id={'price'}
-                type="number"
-                value={price}
-                onChange={e => setPrice(Number(e.target.value))}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                min="1"
+            {/* 設定ボタン */}
+            <div className={'w-full'}>
+              <SettingsDialog
+                dataUrls={dataUrls}
+                setDataUrls={handleDataUrlsChange}
+                startTime={startTime}
+                setStartTime={setStartTime}
+                endTime={endTime}
+                setEndTime={setEndTime}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="block text-sm font-medium text-gray-700 mb-2">開始時間</div>
-                <div className={'max-w-full'}>
-                  <TimePicker date={startTime} onChange={setStartTime} granularity={'minute'} />
-                </div>
-              </div>
-              <div>
-                <div className="block text-sm font-medium text-gray-700 mb-2">終了時間</div>
-                <div className={'max-w-full'}>
-                  <TimePicker date={endTime} onChange={setEndTime} granularity={'minute'} />
-                </div>
-              </div>
-            </div>
           </div>
-
-          {/* コントロールボタン */}
-          {/*<div className="flex justify-center gap-4 mb-6">*/}
-          {/*  {!isActive ? (*/}
-          {/*    <button*/}
-          {/*      onClick={startTracking}*/}
-          {/*      className="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"*/}
-          {/*    >*/}
-          {/*      📊 販売開始*/}
-          {/*    </button>*/}
-          {/*  ) : (*/}
-          {/*    <button*/}
-          {/*      onClick={stopTracking}*/}
-          {/*      className="bg-red-500 hover:bg-red-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"*/}
-          {/*    >*/}
-          {/*      ⏹️ 販売終了*/}
-          {/*    </button>*/}
-          {/*  )}*/}
-          {/*  <button*/}
-          {/*    onClick={resetSales}*/}
-          {/*    className="bg-gray-500 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-colors"*/}
-          {/*  >*/}
-          {/*    🔄 リセット*/}
-          {/*  </button>*/}
-          {/*</div>*/}
+          <Separator />
+          {/*商品リスト*/}
+          {itemList.length > 0 ? (
+            itemList.map((item, i) => (
+              <Card key={i} className={'shadow-none min-h-48'}>
+                <CardHeader>
+                  <CardTitle className={'text-xl'}>{item.name}</CardTitle>
+                  <CardDescription>
+                    ￥{item.price} ・ 売上目標{item.targetSales}個
+                  </CardDescription>
+                  <CardAction className={'flex items-center justify-center gap-1 text-lg'}>
+                    <div>
+                      <EditItemDialog
+                        onEdit={handleEditItem}
+                        open={editItemDialogOpen}
+                        onOpenChange={setEditItemDialogOpen}
+                        item={editingItem}
+                        onClick={() => setEditingItem(item)}
+                      />
+                    </div>
+                    <div>
+                      <DeleteItemDialog
+                        open={deleteDialogOpen}
+                        onOpenChange={setDeleteDialogOpen}
+                        item={deletingItem}
+                        onDelete={handleDeleteItem}
+                        onClick={() => setDeletingItem(item)}
+                      />
+                    </div>
+                  </CardAction>
+                </CardHeader>
+                <CardContent>
+                  <div className={'w-full flex items-center justify-between'}>
+                    <div>
+                      <span className={'text-blue-500 text-5xl font-bold'}>{item.sold}</span>
+                      <span className={'text-gray-500 text-lg'}>/ {item.targetSales} 個</span>
+                    </div>
+                    <div className="flex justify-center items-center gap-4 flex-wrap">
+                      <button
+                        onClick={() => addSale('ticket', item.name, item.price)}
+                        disabled={loading}
+                        className={`flex gap-2 items-center justify-center text-3xl font-bold h-16 px-5 rounded-full transition-all transform hover:scale-105 ${
+                          !loading
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white shadow-lg'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        <Tickets size={30} /> 売上
+                      </button>
+                      <button
+                        onClick={() => addSale('auPay', item.name, item.price)}
+                        disabled={loading}
+                        className={`flex gap-2 items-center justify-center text-3xl font-bold h-16 px-5 rounded-full transition-all transform hover:scale-105 ${
+                          !loading
+                            ? 'bg-[#EB5505] hover:bg-[#bf4402] text-white shadow-lg'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        <ScanQrCode size={30} /> 売上
+                      </button>
+                      <button
+                        onClick={() => removeLastSales(item.name)}
+                        disabled={currentSales === 0 || loading}
+                        className={`text-3xl font-bold flex justify-center items-center h-16 w-16 rounded-full transition-all transform hover:scale-105 ${
+                          currentSales > 0 && !loading
+                            ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
+                      >
+                        <Minus />
+                      </button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          ) : (
+            <Card className={'shadow-none min-h-48 flex items-center justify-center'}>
+              <CardContent className={'w-full  h-full flex items-center justify-center'}>
+                <p className={'text-muted-foreground text-center'}>
+                  商品がまだ追加されていません。
+                  <br />
+                  左上の&nbsp;<span className={'bg-secondary p-1 rounded-md'}>+ 商品を追加</span>
+                  &nbsp; から追加してください。
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* 右側: グラフ */}
+        {/* 右側 */}
         <div className="bg-white rounded-lg shadow-lg p-6 min-h-[76vh]">
+          <div className="bg-blue-50 rounded-lg p-6 mb-4 text-center">
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">現在の売上</h2>
+            <div className="text-6xl font-bold text-blue-600 mb-4">{currentSales}</div>
+            <div className="text-lg text-gray-600">/ {targetSales} 個</div>
+            <div className="w-full bg-gray-200 rounded-full h-4 mt-4">
+              <div
+                className="bg-blue-600 h-4 rounded-full transition-all duration-300"
+                style={{ width: `${Math.min(achievementRate, 100)}%` }}
+              ></div>
+            </div>
+            <div className="text-sm text-gray-600 mt-2">達成率: {achievementRate.toFixed(1)}%</div>
+          </div>
           <h3 className="text-lg font-bold text-gray-800 mb-4">売上推移グラフ</h3>
           {predictionData.length > 0 ? (
             <ResponsiveContainer width="100%" height={500}>
